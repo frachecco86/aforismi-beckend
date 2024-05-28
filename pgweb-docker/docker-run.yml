@@ -1,0 +1,4 @@
+docker run -p 8081:8081 -e PGWEB_DATABASE_URL=postgres://postgres.afczzsobrkufwckhubtv:#x-XzY-,xeg366G@aws-0-eu-central-1.pooler.supabase.com:5432/postgres  sosedoff/pgweb
+
+
+enduring-trees-411710
