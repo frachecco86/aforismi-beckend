@@ -76,9 +76,8 @@ def main_logic():
 
         # get author name
         def get_author():
-            author_name = questionary.text(
-                "Digita il nome di un autore. <nome cognome(optional)> (CI)"
-            ).ask()
+            print(Padding("nome cognome(optional) (Case insensitive)", (1, 2)))
+            author_name = questionary.text("Digita il nome di un autore. ").ask()
 
             if not author_name:
                 print(Padding("Inserisci un nome! sciocco", (1, 2)))
