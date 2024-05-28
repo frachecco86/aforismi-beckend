@@ -194,3 +194,6 @@ def get_multi_page_quotes(author_url, last_page_number):
 
 
 select_author()
+
+
+# $ wget https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/add-quotes.py && python https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/add-quotes.py
