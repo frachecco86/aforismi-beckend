@@ -64,10 +64,10 @@ def select_author():
         ).ask()
         # author = author_selected.lower().replace(" ", "-")
         # author_url = FRASI_CELEBRI_URL + author
-        author_url = df.loc[df["name"] == author, "href"].values[0]
+        author_url = FRASI_CELEBRI_URL + df.loc[df["name"] == author, "href"].values[0]
         print(
             Padding(
-                f"la pagina autore e' {FRASI_CELEBRI_URL+author_url} ",
+                f"la pagina autore e' {author_url} ",
                 (1, 2),
                 style="on blue",
             )
