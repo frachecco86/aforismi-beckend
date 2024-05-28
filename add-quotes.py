@@ -1,22 +1,20 @@
-import signal
-import sys
 import re
-import asyncio
-from prisma import Prisma
-import requests
-from bs4 import BeautifulSoup as bs
-
-# disbale ssl warnings
-requests.packages.urllib3.disable_warnings()
-# promp libraries
 import questionary
-from rich.text import Text
+import requests
+import pandas as pd
+
+
+# from prisma import Prisma
+from bs4 import BeautifulSoup as bs
 from rich.padding import Padding
 from rich.progress import track
 from rich import print
 from rich.console import Console
 from rich.markdown import Markdown
-import pandas as pd
+
+# disbale ssl warnings
+requests.packages.urllib3.disable_warnings()
+# promp libraries
 
 pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_colwidth", 200)
@@ -34,7 +32,7 @@ Questo script lavora nel sito ==frasicelebri==:
 """
 
 FRASI_CELEBRI_NAME = "frasicelebri.it"
-FRASI_CELEBRI_URL = url = "https://www.frasicelebri.it/frasi-di/"
+FRASI_CELEBRI_URL = url = "https://www.frasicelebri.it"
 AUTHOR_URL = ""
 
 console = Console()
@@ -43,9 +41,8 @@ console.print(md)
 
 
 # Get frasicelebri authors list
-csv_file = "https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/frasi_celebri_authors.csv"
-df = pd.read_csv(csv_file)
-authors_list = df["0"].values.tolist()
+df = pd.read_csv("./frasi_celebri_authors.csv")
+authors_list = df["name"].values.tolist()
 
 
 def keyword_search(items, keyword):
@@ -61,24 +58,46 @@ def select_author():
             "inserisci il nome dell'autore o una parola chiave"
         ).ask()
         matching_items = keyword_search(authors_list, keyword)
-        author_selected = questionary.select(
+        author = questionary.select(
             "Scegli l'autore dalla lista",
             choices=matching_items,
         ).ask()
-        author = author_selected.lower().replace(" ", "-")
-        author_url = FRASI_CELEBRI_URL + author
-        response = requests.get(author_url, verify=False)
-        soup = bs(response.text, "html.parser")
-        get_author_quotes(soup, author_url)
+        # author = author_selected.lower().replace(" ", "-")
+        # author_url = FRASI_CELEBRI_URL + author
+        author_url = df.loc[df["name"] == author, "href"].values[0]
+        print(
+            Padding(
+                f"la pagina autore e' {FRASI_CELEBRI_URL+author_url} ",
+                (1, 2),
+                style="on blue",
+            )
+        )
 
+        if questionary.text("Procedere?").ask():
+            response = requests.get(author_url, verify=False)
+            if response.ok:
+                requests.get(author_url, verify=False)
+                soup = bs(response.text, "html.parser")
+                get_author_quotes(soup, author_url)
+            else:
+                print(
+                    Padding(
+                        (f"l{author_url} non e' valido o la pagina e' diversa"),
+                        (1, 2),
+                        style="on red",
+                    )
+                )
         if not questionary.confirm("Vuoi scegliere un altro autore?").ask():
             break
 
 
 def get_author_quotes(soup, author_url):
-    element = soup.select_one(".fc-pagination ul li.last-page a")
-    last_page_number = element.text if element else None
-    more_pages = bool(element)
+    if soup.select_one(".fc-pagination ul li.last-page a"):
+        element = soup.select_one(".fc-pagination ul li.last-page a")
+        last_page_number = element.text if element else None
+        more_pages = bool(element)
+    else:
+        print("nessuna citazione trovata")
 
     if more_pages:
         if questionary.confirm(

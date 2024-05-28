@@ -2,6 +2,8 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup as bs
 import string
+from rich.progress import track
+import questionary
 
 requests.packages.urllib3.disable_warnings()
 
@@ -12,13 +14,28 @@ urls = [
 ]
 
 # Scrape and collect authors' names
-authors_list = []
+authors_names = []
+authors_hrefs = []
+
+authors = []
 for url in urls:
     soup = bs(requests.get(url, verify=False).text, "html.parser")
-    authors_list.extend([a.text for a in soup.select("#authors-index > h2 ~ a")])
+
+    for a in track(soup.select("#authors-index > h2 ~ a")):
+        name = a.text
+        href = a["href"]
+        authors.append({"name": name, "href": href})
+
+df = pd.DataFrame(authors)
+
+if questionary.confirm("Scrivere il  il dataframe sul file csv?").ask():
+    df.to_csv("frasi_celebri_authors.csv", index=False)
 
 
-pd.DataFrame(authors_list).to_csv("frasi_celebri_authors.csv", index=False)
+# print(pd.DataFrame(authors_hrefs).head(10))
+# pd.DataFrame(authors_names).to_csv("frasi_celebri_authors.csv", index=False)
+# pd.DataFrame(authors_hrefs).to_csv("frasi_celebri_authors_hrefs.csv", index=False)
+
 
 # Prepare data for DataFrame
 # authors_data = [
