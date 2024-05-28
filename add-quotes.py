@@ -61,7 +61,8 @@ console.print(md)
 
 
 # Get frasicelebri authors list
-df = pd.read_csv("frasi_celebri_authors.csv")
+csv_file = "https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/frasi_celebri_authors.csv"
+df = pd.read_csv(csv_file)
 authors_list = df["0"].values.tolist()
 
 
