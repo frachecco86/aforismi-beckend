@@ -46,7 +46,9 @@ from rich.console import Console
 from rich.markdown import Markdown
 import pandas as pd
 
-pd.set_option("display.max_colwidth", None)
+pd.set_option("display.max_rows", 500)
+pd.set_option("display.max_colwidth", 200)
+
 
 FRASI_CELEBRI_NAME = "frasicelebri.it"
 FRASI_CELEBRI_URL = url = "https://www.frasicelebri.it/frasi-di/"
