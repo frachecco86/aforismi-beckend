@@ -1,42 +1,33 @@
-# %%
-from bs4 import BeautifulSoup as bs
 import requests
 import pandas as pd
+from bs4 import BeautifulSoup as bs
 import string
 
+requests.packages.urllib3.disable_warnings()
 
-letters = string.ascii_lowercase
-urls = []
+# Generate URLs for each letter
+urls = [
+    f"https://www.frasicelebri.it/indice/autori/{letter}"
+    for letter in string.ascii_lowercase
+]
+
+# Scrape and collect authors' names
 authors_list = []
-
-# %%
-# get all authros urls
-for l in letters:
-    urls.append(f"https://www.frasicelebri.it/indice/autori/{l}")
-
-# get list all authors
 for url in urls:
-    r = requests.get(url).text
-    soup = bs(r)
-    authors = soup.select("#authors-index > h2 ~ a")
-    for a in authors:
-        author = a.text
-        authors_list.append(author)
-
-# %%
-authors_df = []
-for name in authors_list:
-    name_splitted = name.split(" ")
-    by_surname = list(reversed(name_splitted))
-    authors_df.append({"full_name": name, "by_surname": " ".join(by_surname)})
+    soup = bs(requests.get(url, verify=False).text, "html.parser")
+    authors_list.extend([a.text for a in soup.select("#authors-index > h2 ~ a")])
 
 
-dataframe = pd.DataFrame(authors_df)
+pd.DataFrame(authors_list).to_csv("frasi_celebri_authors.csv", index=False)
 
-csv_file = "authors.csv"
-dataframe.to_csv(csv_file, index=False)
-data = pd.read_csv(csv_file)
-# #mostra tutto il dataframe
-data.columns
+# Prepare data for DataFrame
+# authors_data = [
+#     {"full_name": name, "by_surname": " ".join(reversed(name.split()))}
+#     for name in authors_list
+# ]
 
-# %%
+# # Create and save DataFrame to CSV
+# pd.DataFrame(authors_data).to_csv("authors.csv", index=False)
+
+# # Load and display DataFrame for verification
+# print(pd.read_csv("authors.csv").columns)

@@ -9,6 +9,7 @@ import pandas as pd
 from rich.progress import track
 from rich.padding import Padding
 
+
 MARKDOWN = """
 # Benventi al gestionale di aforismi (un programma x tuo padre series)
 
