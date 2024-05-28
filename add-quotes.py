@@ -48,27 +48,31 @@ df = pd.read_csv(csv_file)
 authors_list = df["0"].values.tolist()
 
 
-def select_author():
-    # Keyword to search for
-    keyword = questionary.text(
-        "inserisci il nome dell'autore o una parola chiave"
-    ).ask()
-    matching_items = keyword_search(authors_list, keyword)
-    author_selected = questionary.select(
-        "Scegli l'autore dalla lista",
-        choices=matching_items,
-    ).ask()
-    author = author_selected.lower().replace(" ", "-")
-    author_url = FRASI_CELEBRI_URL + author
-    response = requests.get(author_url, verify=False)
-    soup = bs(response.text, "html.parser")
-    get_author_quotes(soup, author_url)
-
-
 def keyword_search(items, keyword):
     pattern = re.compile(keyword, re.IGNORECASE)
     authors = [item for item in items if pattern.search(item)]
     return authors
+
+
+def select_author():
+    while True:
+        # Keyword to search for
+        keyword = questionary.text(
+            "inserisci il nome dell'autore o una parola chiave"
+        ).ask()
+        matching_items = keyword_search(authors_list, keyword)
+        author_selected = questionary.select(
+            "Scegli l'autore dalla lista",
+            choices=matching_items,
+        ).ask()
+        author = author_selected.lower().replace(" ", "-")
+        author_url = FRASI_CELEBRI_URL + author
+        response = requests.get(author_url, verify=False)
+        soup = bs(response.text, "html.parser")
+        get_author_quotes(soup, author_url)
+
+        if not questionary.confirm("Vuoi scegliere un altro autore?").ask():
+            break
 
 
 def get_author_quotes(soup, author_url):
@@ -81,18 +85,13 @@ def get_author_quotes(soup, author_url):
             f"procedere con lo scraping dell'autore.Sono presenti {last_page_number} pagine "
         ).ask():
             get_multi_page_quotes(author_url, last_page_number)
-
-        else:
-            select_author()
     else:
-        if questionary.confirm("Procedere con lo scraping?"):
-
+        if questionary.confirm("Procedere con lo scraping?").ask():
             get_single_page_quotes(author_url)
 
 
 def get_single_page_quotes(author_url):
     page_text = requests.get(author_url, verify=False).text
-
     blockquotes = bs(page_text, features="html.parser").select("blockquote.clearfix")
     quotes = []
     for quote in track(blockquotes, description="Fetching quotes..."):
@@ -100,9 +99,6 @@ def get_single_page_quotes(author_url):
 
     if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
         print(pd.DataFrame(quotes))
-        select_author()
-    else:
-        return
 
 
 def get_multi_page_quotes(author_url, last_page_number):
@@ -126,12 +122,8 @@ def get_multi_page_quotes(author_url, last_page_number):
             if selected_quote:
                 quotes.append(selected_quote.text)
 
-    questionary.confirm("Visualizzare le citazioni dell'autore?").ask()
-    print(pd.DataFrame(quotes))
-    select_author()
+    if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
+        print(pd.DataFrame(quotes))
 
 
 select_author()
-
-
-# $ wget https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/add-quotes.py && python https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/add-quotes.py
