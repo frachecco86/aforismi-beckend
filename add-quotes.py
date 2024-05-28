@@ -1,22 +1,6 @@
-# use Vercel database with prisma schema.
-
-MARKDOWN = """
-# Benventi al gestionale di aforismi (un programma x tuo padre series 🤩)
-
-Questo script lavora nel sito ==frasicelebri==: 
-
-- scraping sulle pagine del sito frasicelebri
-- visualizza le citazioni
-- inserimento nel database (da fare)
-
----
-"""
-
-
 import signal
 import sys
 import re
-
 import asyncio
 from prisma import Prisma
 import requests
@@ -24,7 +8,6 @@ from bs4 import BeautifulSoup as bs
 
 # disbale ssl warnings
 requests.packages.urllib3.disable_warnings()
-
 # promp libraries
 import questionary
 from rich.text import Text
@@ -38,22 +21,21 @@ import pandas as pd
 pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_colwidth", 200)
 
+MARKDOWN = """
+# Benventi al gestionale di aforismi (un programma x tuo padre series 🤩)
+
+Questo script lavora nel sito ==frasicelebri==: 
+
+- scraping sulle pagine del sito frasicelebri
+- visualizza le citazioni
+- inserimento nel database (da fare)
+
+---
+"""
 
 FRASI_CELEBRI_NAME = "frasicelebri.it"
 FRASI_CELEBRI_URL = url = "https://www.frasicelebri.it/frasi-di/"
 AUTHOR_URL = ""
-
-
-def signal_handler(sig, frame):
-    print("Ctrl+C detected. Exiting gracefully...")
-    sys.exit(0)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
-
-# Your main program logic goes here
-print("Running... Press Ctrl+C to exit.")
 
 console = Console()
 md = Markdown(MARKDOWN)
@@ -64,19 +46,6 @@ console.print(md)
 csv_file = "https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/frasi_celebri_authors.csv"
 df = pd.read_csv(csv_file)
 authors_list = df["0"].values.tolist()
-
-
-def get_author():
-    print(Padding("nome cognome(optional) (Case insensitive)", (1, 2)))
-    author_name = questionary.text("Digita il nome di un autore. ").ask()
-
-    if not author_name:
-        print(Padding("Inserisci un nome! sciocco", (1, 2)))
-        get_author()
-    else:
-
-        author_url = author_name.lower().replace(" ", "-")
-        get_url_name(author_url)
 
 
 def select_author():
@@ -90,45 +59,16 @@ def select_author():
         choices=matching_items,
     ).ask()
     author = author_selected.lower().replace(" ", "-")
-    get_url_name(author)
+    author_url = FRASI_CELEBRI_URL + author
+    response = requests.get(author_url, verify=False)
+    soup = bs(response.text, "html.parser")
+    get_author_quotes(soup, author_url)
 
 
 def keyword_search(items, keyword):
     pattern = re.compile(keyword, re.IGNORECASE)
     authors = [item for item in items if pattern.search(item)]
     return authors
-
-
-def get_url_name(author):
-    AUTHOR_URL = FRASI_CELEBRI_URL + author
-    print(Padding(AUTHOR_URL, (1, 2), style="on blue"))
-    if questionary.confirm("Verificare presenza url sul sito?").ask():
-
-        check_author_aviability(AUTHOR_URL, author)
-    else:
-        select_author()
-    # question = questionary.confirm("Procedere allo ")
-
-
-def check_author_aviability(author_url, author):
-    try:
-        response = requests.get(author_url, verify=False)
-        response.raise_for_status()  # Raise an exception for non-200 status codes
-    except requests.exceptions.RequestException as e:
-        print(f"La pagina non esiste: {e}")
-        if questionary.confirm("Vuoi ricominciare?").ask():
-            select_author()
-        else:
-            return
-    else:
-        # Se l;autore esiste nel isto cheidere confemra
-        if questionary.confirm(
-            f"L'autore {author} e' presente in {FRASI_CELEBRI_NAME } procedere?"
-        ).ask():
-            soup = bs(response.text, "html.parser")
-            get_author_quotes(soup, author_url)
-        else:
-            select_author()
 
 
 def get_author_quotes(soup, author_url):
@@ -160,6 +100,7 @@ def get_single_page_quotes(author_url):
 
     if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
         print(pd.DataFrame(quotes))
+        select_author()
     else:
         return
 
@@ -178,19 +119,16 @@ def get_multi_page_quotes(author_url, last_page_number):
         (bs(page, features="html.parser").select("blockquote.clearfix"))
         for page in pages_text
     ]
-
-    # quotes =  get all quote
     quotes = []
     for blockquote in blockquotes:
         for quote in track(blockquote):
-            quote = quote.select_one("span.whole-read-more").text
+            selected_quote = quote.select_one("span.whole-read-more")
+            if selected_quote:
+                quotes.append(selected_quote.text)
 
-            quotes.append(quote)
-
-    if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
-        print(pd.DataFrame(quotes))
-    else:
-        select_author()
+    questionary.confirm("Visualizzare le citazioni dell'autore?").ask()
+    print(pd.DataFrame(quotes))
+    select_author()
 
 
 select_author()

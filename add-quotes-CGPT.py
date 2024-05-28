@@ -1,116 +1,129 @@
 import signal
 import sys
+import re
+import asyncio
+from prisma import Prisma
 import requests
 from bs4 import BeautifulSoup as bs
+
+# disbale ssl warnings
+requests.packages.urllib3.disable_warnings()
+# promp libraries
 import questionary
+from rich.text import Text
+from rich.padding import Padding
+from rich.progress import track
+from rich import print
 from rich.console import Console
 from rich.markdown import Markdown
 import pandas as pd
-from rich.progress import track
-from rich.padding import Padding
 
+pd.set_option("display.max_rows", 500)
+pd.set_option("display.max_colwidth", 200)
 
 MARKDOWN = """
-# Benventi al gestionale di aforismi (un programma x tuo padre series)
+# Benventi al gestionale di aforismi (un programma x tuo padre series 🤩)
 
 Questo script lavora nel sito ==frasicelebri==: 
+
 - scraping sulle pagine del sito frasicelebri
 - visualizza le citazioni
 - inserimento nel database (da fare)
+
 ---
 """
 
-FRASI_CELEBRI_URL = "https://www.frasicelebri.it/frasi-di/"
+FRASI_CELEBRI_NAME = "frasicelebri.it"
+FRASI_CELEBRI_URL = url = "https://www.frasicelebri.it/frasi-di/"
+AUTHOR_URL = ""
+
 console = Console()
 md = Markdown(MARKDOWN)
 console.print(md)
 
-requests.packages.urllib3.disable_warnings()
-pd.set_option("display.max_rows", 500)
-pd.set_option("display.max_colwidth", 200)
+
+# Get frasicelebri authors list
+csv_file = "https://raw.githubusercontent.com/frachecco86/aforismi-beckend/main/frasi_celebri_authors.csv"
+df = pd.read_csv(csv_file)
+authors_list = df["0"].values.tolist()
 
 
-def signal_handler(sig, frame):
-    print("Ctrl+C detected. Exiting gracefully...")
-    sys.exit(0)
+def keyword_search(items, keyword):
+    pattern = re.compile(keyword, re.IGNORECASE)
+    authors = [item for item in items if pattern.search(item)]
+    return authors
 
 
-signal.signal(signal.SIGINT, signal_handler)
-
-
-def main_logic():
+def select_author():
     while True:
-        author_name = get_author_name()
-        author_url = FRASI_CELEBRI_URL + author_name.lower().replace(" ", "-")
-        if verify_author_url(author_url, author_name):
-            soup = bs(requests.get(author_url, verify=False).text, "html.parser")
-            last_page_number = get_last_page_number(soup)
-            if last_page_number:
-                scrape_multi_page_quotes(author_url, last_page_number)
-            else:
-                scrape_single_page_quotes(author_url)
-
-
-def get_author_name():
-    while True:
-        print(Padding("nome cognome(optional) (Case insensitive)", (1, 2)))
-        author_name = questionary.text("Digita il nome di un autore: ").ask()
-        if author_name:
-            return author_name
-        else:
-            console.print(Padding("Inserisci un nome! sciocco", (1, 2)))
-
-
-def verify_author_url(author_url, author_name):
-    try:
+        # Keyword to search for
+        keyword = questionary.text(
+            "inserisci il nome dell'autore o una parola chiave"
+        ).ask()
+        matching_items = keyword_search(authors_list, keyword)
+        author_selected = questionary.select(
+            "Scegli l'autore dalla lista",
+            choices=matching_items,
+        ).ask()
+        author = author_selected.lower().replace(" ", "-")
+        author_url = FRASI_CELEBRI_URL + author
         response = requests.get(author_url, verify=False)
-        response.raise_for_status()
-        if questionary.confirm(f"L'autore {author_name} è presente. Procedere?").ask():
-            return True
-    except requests.exceptions.RequestException:
-        console.print(f"La pagina per {author_name} non esiste.")
-    return False
+        soup = bs(response.text, "html.parser")
+        get_author_quotes(soup, author_url)
+
+        if not questionary.confirm("Vuoi scegliere un altro autore?").ask():
+            break
 
 
-def get_last_page_number(soup):
+def get_author_quotes(soup, author_url):
     element = soup.select_one(".fc-pagination ul li.last-page a")
-    return element.text if element else None
+    last_page_number = element.text if element else None
+    more_pages = bool(element)
+
+    if more_pages:
+        if questionary.confirm(
+            f"procedere con lo scraping dell'autore.Sono presenti {last_page_number} pagine "
+        ).ask():
+            get_multi_page_quotes(author_url, last_page_number)
+    else:
+        if questionary.confirm("Procedere con lo scraping?").ask():
+            get_single_page_quotes(author_url)
 
 
-def scrape_single_page_quotes(author_url):
+def get_single_page_quotes(author_url):
     page_text = requests.get(author_url, verify=False).text
-    blockquotes = bs(page_text, "html.parser").select("blockquote.clearfix")
-    quotes = [quote.select_one("span.whole-read-more").text for quote in blockquotes]
-    display_quotes(quotes)
+    blockquotes = bs(page_text, features="html.parser").select("blockquote.clearfix")
+    quotes = []
+    for quote in track(blockquotes, description="Fetching quotes..."):
+        quotes.append(quote.select_one("span.whole-read-more").text)
 
-
-def scrape_multi_page_quotes(author_url, last_page_number):
-    author_pages = [
-        f"{author_url}/?page={i}" for i in range(1, int(last_page_number) + 1)
-    ]
-    pages_text = [
-        requests.get(page, verify=False).text
-        for page in track(author_pages, description="Collecting pages...")
-    ]
-    blockquotes = [
-        bs(page, "html.parser").select("blockquote.clearfix") for page in pages_text
-    ]
-    quotes = [
-        quote.select_one("span.whole-read-more").text
-        for blockquote in blockquotes
-        for quote in blockquote
-    ]
-    display_quotes(quotes)
-
-
-def display_quotes(quotes):
     if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
         print(pd.DataFrame(quotes))
 
 
-if __name__ == "__main__":
-    console.print("Running... Press Ctrl+C to exit.")
-    try:
-        main_logic()
-    except KeyboardInterrupt:
-        console.print("KeyboardInterrupt: Exiting...")
+def get_multi_page_quotes(author_url, last_page_number):
+    author_pages = [
+        f"{author_url}/?page={i}" for i in range(1, int(last_page_number) + 1)
+    ]
+    # display author page urls
+    console.print(author_pages)
+    pages_text = [
+        requests.get(page, verify=False).text
+        for page in track(author_pages, description="collecting pages pages")
+    ]
+    blockquotes = [
+        (bs(page, features="html.parser").select("blockquote.clearfix"))
+        for page in pages_text
+    ]
+    quotes = []
+    for blockquote in blockquotes:
+        for quote in track(blockquote):
+            selected_quote = quote.select_one("span.whole-read-more")
+            if selected_quote:
+                quotes.append(selected_quote.text)
+
+    if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
+        print(pd.DataFrame(quotes))
+
+
+select_author()
