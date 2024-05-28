@@ -1,6 +1,5 @@
 import signal
 import sys
-import asyncio
 import requests
 from bs4 import BeautifulSoup as bs
 import questionary
@@ -25,16 +24,18 @@ console = Console()
 md = Markdown(MARKDOWN)
 console.print(md)
 
-# Disable SSL warnings
 requests.packages.urllib3.disable_warnings()
 pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_colwidth", 200)
+
 
 def signal_handler(sig, frame):
     print("Ctrl+C detected. Exiting gracefully...")
     sys.exit(0)
 
+
 signal.signal(signal.SIGINT, signal_handler)
+
 
 def main_logic():
     while True:
@@ -48,13 +49,16 @@ def main_logic():
             else:
                 scrape_single_page_quotes(author_url)
 
+
 def get_author_name():
     while True:
+        print(Padding("nome cognome(optional) (Case insensitive)", (1, 2)))
         author_name = questionary.text("Digita il nome di un autore: ").ask()
         if author_name:
             return author_name
         else:
             console.print(Padding("Inserisci un nome! sciocco", (1, 2)))
+
 
 def verify_author_url(author_url, author_name):
     try:
@@ -66,9 +70,11 @@ def verify_author_url(author_url, author_name):
         console.print(f"La pagina per {author_name} non esiste.")
     return False
 
+
 def get_last_page_number(soup):
     element = soup.select_one(".fc-pagination ul li.last-page a")
     return element.text if element else None
+
 
 def scrape_single_page_quotes(author_url):
     page_text = requests.get(author_url, verify=False).text
@@ -76,16 +82,30 @@ def scrape_single_page_quotes(author_url):
     quotes = [quote.select_one("span.whole-read-more").text for quote in blockquotes]
     display_quotes(quotes)
 
+
 def scrape_multi_page_quotes(author_url, last_page_number):
-    author_pages = [f"{author_url}/?page={i}" for i in range(1, int(last_page_number) + 1)]
-    pages_text = [requests.get(page, verify=False).text for page in track(author_pages, description="Collecting pages...")]
-    blockquotes = [bs(page, "html.parser").select("blockquote.clearfix") for page in pages_text]
-    quotes = [quote.select_one("span.whole-read-more").text for blockquote in blockquotes for quote in blockquote]
+    author_pages = [
+        f"{author_url}/?page={i}" for i in range(1, int(last_page_number) + 1)
+    ]
+    pages_text = [
+        requests.get(page, verify=False).text
+        for page in track(author_pages, description="Collecting pages...")
+    ]
+    blockquotes = [
+        bs(page, "html.parser").select("blockquote.clearfix") for page in pages_text
+    ]
+    quotes = [
+        quote.select_one("span.whole-read-more").text
+        for blockquote in blockquotes
+        for quote in blockquote
+    ]
     display_quotes(quotes)
+
 
 def display_quotes(quotes):
     if questionary.confirm("Visualizzare le citazioni dell'autore?").ask():
         print(pd.DataFrame(quotes))
+
 
 if __name__ == "__main__":
     console.print("Running... Press Ctrl+C to exit.")
