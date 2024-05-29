@@ -12,6 +12,16 @@ from rich import print
 from rich.console import Console
 from rich.markdown import Markdown
 
+import logging
+from rich.logging import RichHandler
+
+# FORMAT = "%(message)s"
+# logging.basicConfig(
+#     level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+# )
+
+# log = logging.getLogger("rich")
+
 # disbale ssl warnings
 requests.packages.urllib3.disable_warnings()
 # promp libraries
@@ -76,6 +86,7 @@ def select_author():
         if questionary.text("Procedere?").ask():
             response = requests.get(author_url, verify=False)
             if response.ok:
+                # log.info("response ok")
                 requests.get(author_url, verify=False)
                 soup = bs(response.text, "html.parser")
                 get_author_quotes(soup, author_url)
@@ -96,14 +107,11 @@ def get_author_quotes(soup, author_url):
         element = soup.select_one(".fc-pagination ul li.last-page a")
         last_page_number = element.text if element else None
         more_pages = bool(element)
-    else:
-        print("nessuna citazione trovata")
-
-    if more_pages:
-        if questionary.confirm(
-            f"procedere con lo scraping dell'autore.Sono presenti {last_page_number} pagine "
-        ).ask():
-            get_multi_page_quotes(author_url, last_page_number)
+        if more_pages:
+            if questionary.confirm(
+                f"procedere con lo scraping dell'autore.Sono presenti {last_page_number} pagine "
+            ).ask():
+                get_multi_page_quotes(author_url, last_page_number)
     else:
         if questionary.confirm("Procedere con lo scraping?").ask():
             get_single_page_quotes(author_url)
