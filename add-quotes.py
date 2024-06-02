@@ -3,7 +3,6 @@ import questionary
 import requests
 import pandas as pd
 
-
 # from prisma import Prisma
 from bs4 import BeautifulSoup as bs
 from rich.padding import Padding
